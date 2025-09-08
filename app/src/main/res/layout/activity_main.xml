@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <!-- Contador de notas -->
+    <TextView
+        android:id="@+id/txtCount"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/count_template"
+        android:textSize="18sp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Campo para capturar nota -->
+    <EditText
+        android:id="@+id/edtNote"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="@string/hint_note"
+        android:singleLine="true"
+        android:imeOptions="actionDone"
+        android:inputType="text"
+        android:textSize="16sp"
+        app:layout_constraintTop_toBottomOf="@id/txtCount"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/btnAdd"
+        app:layout_constraintHorizontal_weight="1"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="8dp"/>
+
+    <!-- Botón Guardar -->
+    <Button
+        android:id="@+id/btnAdd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/add"
+        app:layout_constraintTop_toTopOf="@id/edtNote"
+        app:layout_constraintBottom_toBottomOf="@id/edtNote"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Listado multi-línea de notas -->
+    <ScrollView
+        android:id="@+id/scrollNotes"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        app:layout_constraintTop_toBottomOf="@id/edtNote"
+        app:layout_constraintBottom_toTopOf="@id/btnClear"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:id="@+id/txtNotes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textIsSelectable="true"
+            android:textSize="16sp"
+            android:padding="8dp"
+            android:lineSpacingExtra="4dp"
+            android:text="@string/notes_placeholder" />
+    </ScrollView>
+
+    <!-- Botón Limpiar -->
+    <Button
+        android:id="@+id/btnClear"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/clear"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>
