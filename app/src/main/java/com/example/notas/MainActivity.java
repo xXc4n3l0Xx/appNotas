@@ -1,26 +1,23 @@
 package com.example.notas;
 
-import android.content.SharedPreferences;
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.example.notas.databinding.ActivityMainBinding;
-import model.Note;
-import vm.NotesViewModel;
+import com.google.android.material.snackbar.Snackbar;
 
-import java.util.ArrayList;
-import java.util.List;
-
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements NotesAdapter.OnNoteClickListener {
 
     private ActivityMainBinding binding;
-    private NotesViewModel vm;
-
-    private static final String PREFS_NAME = "notes_prefs";
-    private static final String KEY_NOTES = "notes_serialized";
+    private NotesViewModel viewModel;
+    private NotesAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,89 +27,116 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // ViewModel
-        vm = new ViewModelProvider(this).get(NotesViewModel.class);
-
-        // Observa los cambios para refrescar UI (contador y listado)
-        vm.getNotes().observe(this, notes -> {
-            binding.txtCount.setText(getString(R.string.count_template, notes.size()));
-            binding.txtNotes.setText(formatNotes(notes));
-        });
-
-        // Cargar de SharedPreferences SOLO si el ViewModel está vacío (primera vez)
-        List<Note> current = vm.getNotes().getValue();
-        if (current == null || current.isEmpty()) {
-            List<Note> loaded = loadFromPrefs();
-            if (!loaded.isEmpty()) vm.setNotes(loaded);
+        // Configurar toolbar (EXTENSIÓN REQUERIDA)
+        setSupportActionBar(binding.toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Mis Notas");
         }
 
-        // Guardar nota
-        binding.btnAdd.setOnClickListener(v -> {
-            String text = binding.edtNote.getText().toString().trim();
-            if (text.isEmpty()) {
-                Toast.makeText(this, "Escribe una nota", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            vm.addNote(text);
-            binding.edtNote.setText("");
-        });
+        // ViewModel
+        viewModel = new ViewModelProvider(this).get(NotesViewModel.class);
 
-        // Limpiar todas las notas
-        binding.btnClear.setOnClickListener(v -> vm.clear());
+        // Configurar RecyclerView (EXTENSIÓN REQUERIDA)
+        setupRecyclerView();
+
+        // Observar cambios en las notas
+        observeNotes();
+    }
+
+    private void setupRecyclerView() {
+        adapter = new NotesAdapter();
+        adapter.setOnNoteClickListener(this);
+
+        binding.recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        binding.recyclerView.setAdapter(adapter);
+    }
+
+    private void observeNotes() {
+        viewModel.getAllNotes().observe(this, notes -> {
+            adapter.setNotes(notes);
+
+            // Actualizar contador
+            if (notes != null) {
+                binding.tvNotesCount.setText(getString(R.string.count_template, notes.size()));
+            }
+
+            // Mostrar mensaje si no hay notas
+            if (notes == null || notes.isEmpty()) {
+                binding.tvEmptyMessage.setText(R.string.no_notes_message);
+                binding.tvEmptyMessage.setVisibility(android.view.View.VISIBLE);
+            } else {
+                binding.tvEmptyMessage.setVisibility(android.view.View.GONE);
+            }
+        });
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
-        // Persistir siempre que la Activity pase a segundo plano (incluye cierre)
-        List<Note> notes = vm.getNotes().getValue();
-        saveToPrefs(notes != null ? notes : new ArrayList<>());
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflar menú con acciones: agregar y eliminar (EXTENSIÓN REQUERIDA)
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
     }
 
-    // --- Serialización simple (id|texto + \n por cada nota) ---
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
 
-    private void saveToPrefs(List<Note> notes) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putString(KEY_NOTES, serialize(notes)).apply();
-    }
-
-    private List<Note> loadFromPrefs() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String data = prefs.getString(KEY_NOTES, "");
-        return deserialize(data);
-    }
-
-    private String serialize(List<Note> notes) {
-        StringBuilder sb = new StringBuilder();
-        for (Note n : notes) {
-            // Evita romper el formato: reemplaza saltos y la barra vertical
-            String safeText = n.text.replace("\n", " ").replace("|", " ");
-            sb.append(n.id).append("|").append(safeText).append("\n");
+        if (id == R.id.action_add_note) {
+            // Acción agregar nota - Abrir AddEditNoteActivity (EXTENSIÓN REQUERIDA)
+            Intent intent = new Intent(this, AddEditNoteActivity.class);
+            startActivity(intent);
+            return true;
+        } else if (id == R.id.action_delete_note) {
+            // Acción eliminar nota (EXTENSIÓN REQUERIDA)
+            deleteSelectedNote();
+            return true;
         }
-        return sb.toString();
+
+        return super.onOptionsItemSelected(item);
     }
 
-    private List<Note> deserialize(String data) {
-        List<Note> list = new ArrayList<>();
-        if (data == null || data.isEmpty()) return list;
+    private void deleteSelectedNote() {
+        Note selectedNote = adapter.getSelectedNote();
 
-        String[] lines = data.split("\n");
-        for (String line : lines) {
-            if (line.isEmpty()) continue;
-            String[] parts = line.split("\\|", 2);
-            if (parts.length == 2) {
-                list.add(new Note(parts[0], parts[1]));
-            }
+        // Validar que hay una selección (EXTENSIÓN REQUERIDA)
+        if (selectedNote == null) {
+            Toast.makeText(this, "Selecciona una nota para eliminar", Toast.LENGTH_SHORT).show();
+            return;
         }
-        return list;
+
+        // Preguntar confirmación con Snackbar (EXTENSIÓN REQUERIDA)
+        Snackbar.make(binding.getRoot(),
+                        "¿Eliminar la nota \"" + selectedNote.title + "\"?",
+                        Snackbar.LENGTH_LONG)
+                .setAction("ELIMINAR", v -> {
+                    // Eliminar registro de BD y actualizar lista (EXTENSIÓN REQUERIDA)
+                    viewModel.delete(selectedNote);
+                    adapter.clearSelection();
+                    Toast.makeText(this, "Nota eliminada", Toast.LENGTH_SHORT).show();
+                })
+                .show();
     }
 
-    private String formatNotes(List<Note> notes) {
-        StringBuilder sb = new StringBuilder();
-        for (Note n : notes) {
-            String shortId = n.id.length() >= 8 ? n.id.substring(0, 8) : n.id;
-            sb.append("• [").append(shortId).append("] ").append(n.text).append("\n");
+    @Override
+    public void onNoteClick(Note note, int position) {
+        // Solo manejar selección visual para eliminar
+        // El adapter ya maneja la selección internamente
+    }
+
+    @Override
+    public void onNoteDoubleClick(Note note) {
+        // Doble clic para editar - Abrir AddEditNoteActivity (EXTENSIÓN REQUERIDA)
+        Intent intent = new Intent(this, AddEditNoteActivity.class);
+        intent.putExtra("NOTE_ID", note.id);
+        startActivity(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Limpiar selección cuando regresamos a la actividad
+        if (adapter != null) {
+            adapter.clearSelection();
         }
-        return sb.toString();
     }
 }
